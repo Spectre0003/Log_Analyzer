@@ -81,14 +81,60 @@ def detect_bruteforce(events):
 				alerts.append({"source_ip":ip,"attempts":count,"window_seconds":WINDOW_SECONDS})
 				break
 	return alerts
-	
+def detect_success_after_failures(events):
+    alerts = []
+    events_by_ip = {}
+    for event in events:
+        ip = event["source_ip"]
+        if ip not in events_by_ip:
+            events_by_ip[ip] = []
+        events_by_ip[ip].append(event)
+    for ip, ip_events in events_by_ip.items():
+        for i, event in enumerate(ip_events):
+            if event["event_type"] != "successful_login":
+                continue
+            success_time = event["timestamp"]
+            failure_count = 0
+            for previous_event in reversed(ip_events[:i]):
+                difference = (
+                    success_time - previous_event["timestamp"]
+                ).total_seconds()
+                if difference <= WINDOW_SECONDS:
+                    if previous_event["event_type"] == "failed_login":
+                        failure_count += 1
+                else:
+                    break
+            if failure_count >= FAILURE_THRESHOLD:
+                alerts.append({
+                    "source_ip": ip,
+                    "username": event["username"],
+                    "failure_count": failure_count,
+                    "window_seconds": WINDOW_SECONDS,
+                    "success_time": success_time
+                })
+    return alerts
 logs = collect_logs()
-
 print("SSH Log Analyzer")
 print("================")
 print(f"Total log lines retrieved: {len(logs)}")
+print()
 events = parse_events(logs)
+successful_count = sum(
+    1 for event in events
+    if event["event_type"] == "successful_login"
+)
+failed_count = sum(
+    1 for event in events
+    if event["event_type"] == "failed_login"
+)
+print("Authentication Summary")
+print("----------------------")
+print(f"Successful logins: {successful_count}")
+print(f"Failed logins:     {failed_count}")
+print()
 alerts = detect_bruteforce(events)
+correlation_alerts=detect_success_after_failures(events)
+print()
 for alert in alerts:
     print(
         f"ALERT: Possible SSH brute-force activity "
@@ -97,4 +143,15 @@ for alert in alerts:
     print(
         f"{alert['attempts']} failed attempts "
         f"within {alert['window_seconds']} seconds."
+    )
+print()
+for alert in correlation_alerts:
+    print(
+        f"ALERT: Successful SSH login after "
+        f"{alert['failure_count']} failed attempts "
+        f"from {alert['source_ip']}!"
+    )
+
+    print(
+        f"User: {alert['username']}"
     )
