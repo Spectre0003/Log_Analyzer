@@ -15,24 +15,50 @@ def collect_logs():
 		return []
 	return result.stdout.splitlines()
 def parse_events(logs):
-	events=[]
-	for line in logs:
-		match=re.search(
-			r"Failed password for (\S+) from (\S+) port (\d+)",
-			line
-		)
-		if match:
-			timestamp_text=" ".join(line.split()[:3])
-			timestamp = datetime.strptime(f"{datetime.now().year} {timestamp_text}","%Y %b %d %H:%M:%S")
-			event={
-				"timestamp": timestamp,
-				"event_type":"failed_login",
-				"username":match.group(1),
-				"source_ip":match.group(2),
-				"source_port":int(match.group(3))
-			}
-			events.append(event)
-	return events
+    events = []
+    for line in logs:
+        failed_match = re.search(
+            r"Failed password for (\S+) from (\S+) port (\d+)",
+            line
+        )
+        if failed_match:
+            timestamp_text = " ".join(line.split()[:3])
+
+            timestamp = datetime.strptime(
+                f"{datetime.now().year} {timestamp_text}",
+                "%Y %b %d %H:%M:%S"
+            )
+            event = {
+                "timestamp": timestamp,
+                "event_type": "failed_login",
+                "username": failed_match.group(1),
+                "source_ip": failed_match.group(2),
+                "source_port": int(failed_match.group(3)),
+                "auth_method": "password"
+            }
+            events.append(event)
+            continue
+        accepted_match = re.search(
+            r"Accepted (password|publickey) for (\S+) from (\S+) port (\d+)",
+            line
+        )
+        if accepted_match:
+            timestamp_text = " ".join(line.split()[:3])
+
+            timestamp = datetime.strptime(
+                f"{datetime.now().year} {timestamp_text}",
+                "%Y %b %d %H:%M:%S"
+            )
+            event = {
+                "timestamp": timestamp,
+                "event_type": "successful_login",
+                "username": accepted_match.group(2),
+                "source_ip": accepted_match.group(3),
+                "source_port": int(accepted_match.group(4)),
+                "auth_method": accepted_match.group(1)
+            }
+            events.append(event)
+    return events
 def detect_bruteforce(events):
 	events_by_ip={}
 	for event in events:
