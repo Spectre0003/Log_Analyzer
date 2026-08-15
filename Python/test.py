@@ -95,5 +95,15 @@ class TestParser(unittest.TestCase):
         events = parse_events(logs)
         alerts = detect_success_after_failures(events)
         self.assertEqual(len(alerts), 0)
+    def test_success_after_old_failures(self):
+        logs = [
+            "Aug 14 13:00:00 kali sshd-session[1234]: Failed password for kali from 192.168.1.50 port 50000 ssh2",
+            "Aug 14 13:00:05 kali sshd-session[1235]: Failed password for kali from 192.168.1.50 port 50001 ssh2",
+            "Aug 14 13:00:10 kali sshd-session[1236]: Failed password for kali from 192.168.1.50 port 50002 ssh2",
+            "Aug 14 13:05:00 kali sshd-session[1237]: Accepted password for kali from 192.168.1.50 port 50003 ssh2"
+        ]
+        events = parse_events(logs)
+        alerts = detect_success_after_failures(events)
+        self.assertEqual(len(alerts), 0)
 if __name__ == "__main__":
     unittest.main()
