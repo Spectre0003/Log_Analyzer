@@ -26,6 +26,12 @@ def parse_arguments():
         default=60,
         help="Time window in seconds for brute-force detection."
     )
+    parser.add_argument(
+	    "--format",
+	    choices=["json", "csv", "both"],
+	    default="both",
+	    help="Output format for alerts."
+    )
     return parser.parse_args()
 args=parse_arguments()
 LOOKBACK=f"{args.days} days ago"
@@ -197,8 +203,10 @@ alerts = detect_bruteforce(events)
 correlation_alerts=detect_success_after_failures(events)
 print()
 all_alerts = alerts + correlation_alerts
-export_json(all_alerts, "alerts.json")
-export_csv(all_alerts, "alerts.csv")
+if args.format in ["json", "both"]:
+    export_json(all_alerts, "alerts.json")
+if args.format in ["csv", "both"]:
+    export_csv(all_alerts, "alerts.csv")
 print()
 print("Security Alerts")
 print("---------------")
