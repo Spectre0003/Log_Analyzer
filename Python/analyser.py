@@ -1,9 +1,34 @@
 from datetime import datetime
 import re
 import subprocess
-LOOKBACK="7 days ago"
-FAILURE_THRESHOLD=3
-WINDOW_SECONDS=60
+import argparse
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Analyze SSH authentication logs for suspicious activity."
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Number of days of SSH logs to analyze."
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=3,
+        help="Number of failed attempts required to trigger detection."
+    )
+    parser.add_argument(
+        "--window",
+        type=int,
+        default=60,
+        help="Time window in seconds for brute-force detection."
+    )
+    return parser.parse_args()
+args=parse_arguments()
+LOOKBACK=f"{args.days} days ago"
+FAILURE_THRESHOLD=args.threshold
+WINDOW_SECONDS=args.window
 def collect_logs():
 	result = subprocess.run(
 		["sudo","journalctl","-u","ssh","--since",LOOKBACK,"--no-pager"],
