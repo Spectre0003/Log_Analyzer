@@ -59,4 +59,4 @@ python3 analyser.py --format both
 
 ### Run the automated tests:
 
-python3 tests/test.py
+python3 -m unittest tests.test
