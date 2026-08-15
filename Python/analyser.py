@@ -2,6 +2,7 @@ from datetime import datetime
 import re
 import subprocess
 import argparse
+import json
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Analyze SSH authentication logs for suspicious activity."
@@ -149,6 +150,9 @@ def detect_success_after_failures(events):
 		    "username": event["username"]
 		})
     return alerts
+def export_json(alerts, filename):
+    with open(filename, "w") as file:
+        json.dump(alerts, file, indent=4)
 logs = collect_logs()
 print("SSH Log Analyzer")
 print("================")
@@ -172,7 +176,7 @@ alerts = detect_bruteforce(events)
 correlation_alerts=detect_success_after_failures(events)
 print()
 all_alerts = alerts + correlation_alerts
-
+export_json(all_alerts, "alerts.json")
 print()
 print("Security Alerts")
 print("---------------")
