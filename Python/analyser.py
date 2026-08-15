@@ -33,10 +33,6 @@ def parse_arguments():
 	    help="Output format for alerts."
     )
     return parser.parse_args()
-args=parse_arguments()
-LOOKBACK=f"{args.days} days ago"
-FAILURE_THRESHOLD=args.threshold
-WINDOW_SECONDS=args.window
 def collect_logs():
 	result = subprocess.run(
 		["sudo","journalctl","-u","ssh","--since",LOOKBACK,"--no-pager"],
@@ -165,13 +161,11 @@ def export_csv(alerts, filename):
         with open(filename, "w", newline="") as file:
             file.write("")
         return
-
     fieldnames = sorted({
         key
         for alert in alerts
         for key in alert.keys()
     })
-
     with open(filename, "w", newline="") as file:
         writer = csv.DictWriter(
             file,
@@ -180,46 +174,47 @@ def export_csv(alerts, filename):
 
         writer.writeheader()
         writer.writerows(alerts)
-logs = collect_logs()
-print("SSH Log Analyzer")
-print("================")
-print(f"Total log lines retrieved: {len(logs)}")
-print()
-events = parse_events(logs)
-successful_count = sum(
-    1 for event in events
-    if event["event_type"] == "successful_login"
-)
-failed_count = sum(
-    1 for event in events
-    if event["event_type"] == "failed_login"
-)
-print("Authentication Summary")
-print("----------------------")
-print(f"Successful logins: {successful_count}")
-print(f"Failed logins:     {failed_count}")
-print()
-alerts = detect_bruteforce(events)
-correlation_alerts=detect_success_after_failures(events)
-print()
-all_alerts = alerts + correlation_alerts
-if args.format in ["json", "both"]:
-    export_json(all_alerts, "alerts.json")
-if args.format in ["csv", "both"]:
-    export_csv(all_alerts, "alerts.csv")
-print()
-print("Security Alerts")
-print("---------------")
-
-if not all_alerts:
-    print("No security alerts detected.")
-
-for alert in all_alerts:
-    print(f"[{alert['severity']}] {alert['rule']}")
-    print(f"Source: {alert['source_ip']}")
-    print(f"Description: {alert['description']}")
-
-    if "username" in alert:
-        print(f"Username: {alert['username']}")
-
+def main():
+    args = parse_arguments()
+    LOOKBACK = f"{args.days} days ago"
+    FAILURE_THRESHOLD = args.threshold
+    WINDOW_SECONDS = args.window
+    logs = collect_logs()
+    print("SSH Log Analyzer")
+    print("================")
+    print(f"Total log lines retrieved: {len(logs)}")
+    events = parse_events(logs)
+    successful_count = sum(
+        1 for event in events
+        if event["event_type"] == "successful_login"
+    )
+    failed_count = sum(
+        1 for event in events
+        if event["event_type"] == "failed_login"
+    )
     print()
+    print("Authentication Summary")
+    print("----------------------")
+    print(f"Successful logins: {successful_count}")
+    print(f"Failed logins:     {failed_count}")
+    alerts = detect_bruteforce(events)
+    correlation_alerts = detect_success_after_failures(events)
+    all_alerts = alerts + correlation_alerts
+    print()
+    print("Security Alerts")
+    print("---------------")
+    if not all_alerts:
+        print("No security alerts detected.")
+    for alert in all_alerts:
+        print(f"[{alert['severity']}] {alert['rule']}")
+        print(f"Source: {alert['source_ip']}")
+        print(f"Description: {alert['description']}")
+        if "username" in alert:
+            print(f"Username: {alert['username']}")
+        print()
+    if args.format in ["json", "both"]:
+        export_json(all_alerts, "alerts.json")
+    if args.format in ["csv", "both"]:
+        export_csv(all_alerts, "alerts.csv")
+if __name__ == "__main__":
+    main()
