@@ -1,4 +1,4 @@
-# SSH Log Analyzer
+# SSH Log Analyser
 
 A Python-based security log analysis tool for detecting suspicious SSH authentication activity on Linux systems.
 
@@ -41,22 +41,22 @@ Default:
 
 ### Run with default settings:
 
-python3 analyzer.py
+python3 analyser.py
 
 ### Show help:
 
-python3 analyzer.py --help
+python3 analyser.py --help
 
 ### Customize detection:
 
-python3 analyzer.py --days 7 --threshold 5 --window 120
+python3 analyser.py --days 7 --threshold 5 --window 120
 
 ### Choose output format:
 
-python3 analyzer.py --format json
-python3 analyzer.py --format csv
-python3 analyzer.py --format both
+python3 analyser.py --format json
+python3 analyser.py --format csv
+python3 analyser.py --format both
 
 ### Run the automated tests:
 
-python3 tests/test_analyzer.py
+python3 tests/test.py
