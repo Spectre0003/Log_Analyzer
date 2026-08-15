@@ -33,16 +33,24 @@ def parse_arguments():
 	    help="Output format for alerts."
     )
     return parser.parse_args()
-def collect_logs():
-	result = subprocess.run(
-		["sudo","journalctl","-u","ssh","--since",LOOKBACK,"--no-pager"],
-		capture_output=True,
-		text=True
-	)
-	if result.returncode!=0:
-		print("Error:Failed to retrieve logs.")
-		return []
-	return result.stdout.splitlines()
+def collect_logs(lookback):
+    result = subprocess.run(
+        [
+            "sudo",
+            "journalctl",
+            "-u",
+            "ssh",
+            "--since",
+            lookback,
+            "--no-pager"
+        ],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        print("Error: Failed to retrieve SSH logs.")
+        return []
+    return result.stdout.splitlines()
 def parse_events(logs):
     events = []
     for line in logs:
@@ -88,37 +96,43 @@ def parse_events(logs):
             }
             events.append(event)
     return events
-def detect_bruteforce(events):
-	events_by_ip={}
-	for event in events:
-		ip=event["source_ip"]
-		if ip not in events_by_ip:
-			events_by_ip[ip]=[]
-		events_by_ip[ip].append(event)
-	alerts=[]
-	for ip, ip_events in events_by_ip.items():
-		for i in range(len(ip_events)):
-			window_start=ip_events[i]["timestamp"]
-			count=0
-			for event in ip_events[i:]:
-				difference=(event["timestamp"]-window_start).total_seconds()
-				if difference<=WINDOW_SECONDS:
-					count+=1
-				else:
-					break
-			if count>=FAILURE_THRESHOLD:
-				alerts.append({
-				    "severity": "HIGH",
-				    "rule": "SSH_BRUTE_FORCE",
-				    "source_ip": ip,
-				    "description": (
-					f"{count} failed SSH authentication attempts "
-					f"within {WINDOW_SECONDS} seconds."
-				    )
-				})
-				break
-	return alerts
-def detect_success_after_failures(events):
+def detect_bruteforce(events, threshold=3, window_seconds=60):
+    events_by_ip = {}
+    for event in events:
+        ip = event["source_ip"]
+        if ip not in events_by_ip:
+            events_by_ip[ip] = []
+        events_by_ip[ip].append(event)
+    alerts = []
+    for ip, ip_events in events_by_ip.items():
+        for i in range(len(ip_events)):
+            window_start = ip_events[i]["timestamp"]
+            count = 0
+            for event in ip_events[i:]:
+                difference = (
+                    event["timestamp"] - window_start
+                ).total_seconds()
+                if difference <= window_seconds:
+                    count += 1
+                else:
+                    break
+            if count >= threshold:
+                alerts.append({
+                    "severity": "HIGH",
+                    "rule": "SSH_BRUTE_FORCE",
+                    "source_ip": ip,
+                    "description": (
+                        f"{count} failed SSH authentication attempts "
+                        f"within {window_seconds} seconds."
+                    )
+                })
+                break
+    return alerts
+def detect_success_after_failures(
+    events,
+    threshold=3,
+    window_seconds=60
+):
     alerts = []
     events_by_ip = {}
     for event in events:
@@ -136,12 +150,12 @@ def detect_success_after_failures(events):
                 difference = (
                     success_time - previous_event["timestamp"]
                 ).total_seconds()
-                if difference <= WINDOW_SECONDS:
+                if difference <= window_seconds:
                     if previous_event["event_type"] == "failed_login":
                         failure_count += 1
                 else:
                     break
-            if failure_count >= FAILURE_THRESHOLD:
+            if failure_count >= threshold:
                 alerts.append({
 		    "severity": "CRITICAL",
 		    "rule": "SSH_BRUTE_FORCE_SUCCESS",
@@ -176,10 +190,7 @@ def export_csv(alerts, filename):
         writer.writerows(alerts)
 def main():
     args = parse_arguments()
-    LOOKBACK = f"{args.days} days ago"
-    FAILURE_THRESHOLD = args.threshold
-    WINDOW_SECONDS = args.window
-    logs = collect_logs()
+    logs = collect_logs(f"{args.days} days ago")
     print("SSH Log Analyzer")
     print("================")
     print(f"Total log lines retrieved: {len(logs)}")
@@ -197,8 +208,16 @@ def main():
     print("----------------------")
     print(f"Successful logins: {successful_count}")
     print(f"Failed logins:     {failed_count}")
-    alerts = detect_bruteforce(events)
-    correlation_alerts = detect_success_after_failures(events)
+    alerts = detect_bruteforce(
+	events,
+	threshold=args.threshold,
+	window_seconds=args.window
+    )
+    correlation_alerts = detect_success_after_failures(
+	    events,
+	    threshold=args.threshold,
+	    window_seconds=args.window
+    )
     all_alerts = alerts + correlation_alerts
     print()
     print("Security Alerts")
