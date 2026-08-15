@@ -78,7 +78,15 @@ def detect_bruteforce(events):
 				else:
 					break
 			if count>=FAILURE_THRESHOLD:
-				alerts.append({"source_ip":ip,"attempts":count,"window_seconds":WINDOW_SECONDS})
+				alerts.append({
+				    "severity": "HIGH",
+				    "rule": "SSH_BRUTE_FORCE",
+				    "source_ip": ip,
+				    "description": (
+					f"{count} failed SSH authentication attempts "
+					f"within {WINDOW_SECONDS} seconds."
+				    )
+				})
 				break
 	return alerts
 def detect_success_after_failures(events):
@@ -106,12 +114,15 @@ def detect_success_after_failures(events):
                     break
             if failure_count >= FAILURE_THRESHOLD:
                 alerts.append({
-                    "source_ip": ip,
-                    "username": event["username"],
-                    "failure_count": failure_count,
-                    "window_seconds": WINDOW_SECONDS,
-                    "success_time": success_time
-                })
+		    "severity": "CRITICAL",
+		    "rule": "SSH_BRUTE_FORCE_SUCCESS",
+		    "source_ip": ip,
+		    "description": (
+			f"Successful SSH login after {failure_count} "
+			f"failed authentication attempts."
+		    ),
+		    "username": event["username"]
+		})
     return alerts
 logs = collect_logs()
 print("SSH Log Analyzer")
@@ -135,23 +146,21 @@ print()
 alerts = detect_bruteforce(events)
 correlation_alerts=detect_success_after_failures(events)
 print()
-for alert in alerts:
-    print(
-        f"ALERT: Possible SSH brute-force activity "
-        f"from {alert['source_ip']}!"
-    )
-    print(
-        f"{alert['attempts']} failed attempts "
-        f"within {alert['window_seconds']} seconds."
-    )
-print()
-for alert in correlation_alerts:
-    print(
-        f"ALERT: Successful SSH login after "
-        f"{alert['failure_count']} failed attempts "
-        f"from {alert['source_ip']}!"
-    )
+all_alerts = alerts + correlation_alerts
 
-    print(
-        f"User: {alert['username']}"
-    )
+print()
+print("Security Alerts")
+print("---------------")
+
+if not all_alerts:
+    print("No security alerts detected.")
+
+for alert in all_alerts:
+    print(f"[{alert['severity']}] {alert['rule']}")
+    print(f"Source: {alert['source_ip']}")
+    print(f"Description: {alert['description']}")
+
+    if "username" in alert:
+        print(f"Username: {alert['username']}")
+
+    print()
