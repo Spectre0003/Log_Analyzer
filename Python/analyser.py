@@ -3,6 +3,7 @@ import re
 import subprocess
 import argparse
 import json
+import csv
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Analyze SSH authentication logs for suspicious activity."
@@ -153,6 +154,26 @@ def detect_success_after_failures(events):
 def export_json(alerts, filename):
     with open(filename, "w") as file:
         json.dump(alerts, file, indent=4)
+def export_csv(alerts, filename):
+    if not alerts:
+        with open(filename, "w", newline="") as file:
+            file.write("")
+        return
+
+    fieldnames = sorted({
+        key
+        for alert in alerts
+        for key in alert.keys()
+    })
+
+    with open(filename, "w", newline="") as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fieldnames
+        )
+
+        writer.writeheader()
+        writer.writerows(alerts)
 logs = collect_logs()
 print("SSH Log Analyzer")
 print("================")
@@ -177,6 +198,7 @@ correlation_alerts=detect_success_after_failures(events)
 print()
 all_alerts = alerts + correlation_alerts
 export_json(all_alerts, "alerts.json")
+export_csv(all_alerts, "alerts.csv")
 print()
 print("Security Alerts")
 print("---------------")
